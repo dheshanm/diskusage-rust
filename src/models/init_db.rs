@@ -1,5 +1,11 @@
 use crate::db;
 
+/// Drops all tables in the database.
+/// 
+/// * `pool` - A reference to a sqlx::PgPool.
+/// * `debug` - A boolean value. If True, log the queries (does not execute them).
+/// 
+/// Returns a Result containing unit or an sqlx::Error.
 pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Error> {
     let drop_user_table = r#"
         DROP TABLE IF EXISTS users;
@@ -29,6 +35,12 @@ pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Erro
     Ok(())
 }
 
+/// Initializes the database with the necessary tables.
+/// 
+/// * `pool` - A reference to a sqlx::PgPool.
+/// * `debug` - A boolean value. If True, log the queries (does not execute them).
+/// 
+/// Returns a Result containing unit or an sqlx::Error.
 pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Error> {
     let create_user_table = r#"
         CREATE TABLE users (

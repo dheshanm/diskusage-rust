@@ -6,7 +6,7 @@ use std::{convert::TryFrom, vec};
 /// 
 /// * `pool` - A reference to a sqlx::PgPool.
 /// * `queries` - A vector of string slices.
-/// * `debug` - A boolean value.
+/// * `debug` - A boolean value, if True, log the queries (does not execute them).
 /// 
 /// Returns a Result containing a Vec of DataFrames or an sqlx::Error.
 pub async fn as_transaction(
@@ -30,14 +30,20 @@ pub async fn as_transaction(
     Ok(())
 }
 
+/// Execute a list of queries (not as a transaction) and return a Vec of DataFrames.
+/// 
+/// * `db_uri` - A string slice.
+/// * `queries` - A vector of string slices.
+///
+/// Returns a Result containing a Vec of DataFrames or a PolarsError.
 pub fn returning_df(
     db_uri: &str,
-    queryies: Vec<&str>,
+    queries: Vec<&str>,
 ) -> Result<Vec<DataFrame>, PolarsError> {
     let source_conn = SourceConn::try_from(db_uri).expect("failed to create source connection");
     let mut dataframes: Vec<DataFrame> = vec![];
 
-    for query in queryies {
+    for query in queries {
         let queries = vec![ CXQuery::from(query) ];
         let destination = get_arrow2(&source_conn, None, &queries).expect("run failed");
         let df = destination.polars().unwrap();
