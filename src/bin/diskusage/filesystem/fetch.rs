@@ -12,13 +12,13 @@ pub fn file_size(path: &Path) -> Result<u64, std::io::Error> {
     Ok(metadata.len())
 }
 
-/// Get the owner of a file
+/// Get the owner of a file or directory.
 ///
 /// * `path` - The path to the file.
 ///
 /// Returns
 /// The user ID of the owner of the file.
-pub fn file_owner(path: &Path) -> Option<u32> {
+pub fn owner(path: &Path) -> Option<u32> {
     let metadata = std::fs::metadata(path).ok()?;
     Some(metadata.uid())
 }

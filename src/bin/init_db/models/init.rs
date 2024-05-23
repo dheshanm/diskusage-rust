@@ -1,4 +1,4 @@
-use crate::db;
+use db;
 
 /// Drops all tables in the database.
 /// 

@@ -1,7 +1,4 @@
-mod db;
 mod models;
-mod filesystem;
-mod users;
 
 use clap::Parser;
 
@@ -11,11 +8,8 @@ use clap::Parser;
     version,
     about
 )]
-/// A CLI tool for tracking disk usage.
+/// A companion tool for the disk usage tracker to initialize the database.
 struct Arguments {
-    /// The root directory to track.
-    #[clap(short, long)]
-    root_dir: String,  
     /// Enable debug mode.
     #[clap(short, long)]
     debug: bool,   
@@ -30,19 +24,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Arguments::parse();
     println!("{:?}", args);
 
-    // let database_url = "postgres://pipeline:piedpiper@localhost:5432/test";
-    // let pool_result = sqlx::postgres::PgPoolOptions::new().connect(database_url).await;
+    let debug = args.debug;
 
-    // let pool = match pool_result {
-    //     Ok(pool) => {
-    //         log::info!("Connected to database: {}", database_url);
-    //         pool
-    //     }
-    //     Err(e) => {
-    //         log::error!("Failed to connect to database: {}", e);
-    //         return Err(e.into());
-    //     }
-    // };
+    let database_url = "postgres://pipeline:piedpiper@localhost:5432/test";
+    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(database_url).await;
+
+    let pool = match pool_result {
+        Ok(pool) => {
+            log::info!("Connected to database: {}", database_url);
+            pool
+        }
+        Err(e) => {
+            log::error!("Failed to connect to database: {}", e);
+            return Err(e.into());
+        }
+    };
 
     // let test_query = vec![
     //     "SELECT 'TEXT' AS result, 1 + 1 AS sum",
@@ -63,7 +59,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     }
     // }).await?;
 
-    // models::init_db::initialize(&pool, true).await?;
+    log::warn!("Dropping all tables...");
+    models::init::drop_all(&pool, debug).await?;
+    log::warn!("Initializing database...");
+    models::init::initialize(&pool, debug).await?;
+    log::info!("Database initialized.");
 
     Ok(())
 }

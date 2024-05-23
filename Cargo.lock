@@ -648,12 +648,14 @@ dependencies = [
 name = "diskusage"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clap",
  "connectorx",
  "env_logger",
  "log",
  "polars",
  "rayon",
+ "serde",
  "sqlx",
  "tokio",
  "users",
