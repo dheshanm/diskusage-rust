@@ -54,8 +54,7 @@ pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Er
             directory_id TEXT PRIMARY KEY,
             owner_id INT,
             parent_id TEXT,
-            FOREIGN KEY (owner_id) REFERENCES users(user_id),
-            FOREIGN KEY (parent_id) REFERENCES directories(directory_id)
+            FOREIGN KEY (owner_id) REFERENCES users(user_id)
         );
     "#;
 
@@ -73,7 +72,7 @@ pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Er
             name VARCHAR(255) NOT NULL,
             size BIGINT NOT NULL,
             owner_id INT,
-            directory_id TEXT,
+            directory_id TEXT NOT NULL,
             FOREIGN KEY (owner_id) REFERENCES users(user_id),
             FOREIGN KEY (directory_id) REFERENCES directories(directory_id)
         );

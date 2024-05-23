@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             user_id: owner_i32.unwrap_or_default(),
                             username: users::username::get_username(owner.unwrap_or_default())
                         };
-                        user.insert(&pool_c).await.unwrap_or_default();
+                        user.insert(&pool_c).await.unwrap();
                     }
                 });
                 
@@ -95,6 +95,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
 
                 log::info!("directory: {:?}", directory);
+                handle.block_on(async {
+                    directory.insert(&pool).await.unwrap();
+                });
             } else {
                 let file_path = entry.path();
                 let owner: Option<u32> = filesystem::fetch::owner(file_path);
@@ -106,9 +109,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     file_id: file_path.to_string_lossy().to_string(),
                     name: file_path.file_name().unwrap().to_string_lossy().to_string(),
                     size: file_size as i64,
-                    owner_id: owner_i32.unwrap_or_default(),
+                    owner_id: owner_i32,
                     directory_id: parent_dir.to_string_lossy().to_string(),
                 };
+
+                handle.block_on(async {
+                    file.insert(&pool).await.unwrap();
+                });
 
                 log::info!("file: {:?}", file);
             }
