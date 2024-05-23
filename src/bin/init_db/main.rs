@@ -26,8 +26,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let debug = args.debug;
 
-    let database_url = "postgres://pipeline:piedpiper@localhost:5432/test";
-    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(database_url).await;
+    // get the database url from the environment
+    let database_url = match std::env::var("DATABASE_URL") {
+        Ok(url) => url,
+        Err(_) => {
+            log::error!("DATABASE_URL environment variable not set.");
+            return Err("DATABASE_URL environment variable not set.".into());
+        }
+    };
+
+    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(&database_url).await;
 
     let pool = match pool_result {
         Ok(pool) => {
