@@ -15,7 +15,7 @@ This crawler is written in Rust and uses the `walkdir` crate to traverse the dir
 
 ## Limitations
 - The crawler is Unix specific and uses the `std::os::unix::fs::MetadataExt` module to read file metadata.
-- The `sqlx` crate requires a valid schema to be present in the database. This schema can be generated using the `init_db` binary.
+- The `sqlx` crate requires a valid schema to be present in the database, during compilation. This schema can be generated using the `init_db` binary.
   - This might require partial compilation of the project, which can be done using the `cargo build --bin init_db` command. 
 
 ## Usage
