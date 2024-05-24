@@ -11,13 +11,17 @@ path = "src/bin/init_db/main.rs"
 name = "diskusage"
 path = "src/bin/diskusage/main.rs"
 
+[[bin]]
+name = "estimate"
+path = "src/bin/estimate/main.rs"
+
 [lib]
 name = "db"
 path = "src/lib/db/mod.rs"
 
 [dependencies]
 # tokio (no TLS)
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "macros", "chrono"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "macros", "chrono", "bigdecimal"] }
 tokio = { version = "1", features = ["full"] }
 polars = "0.32"  # downgraded for compatibility with connectorx
 connectorx = { version = "0.3", features = ["src_postgres", "dst_arrow2"] }
@@ -31,3 +35,4 @@ serde = { version = "1.0", features = ["derive"] }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
+bigdecimal = "0.4"

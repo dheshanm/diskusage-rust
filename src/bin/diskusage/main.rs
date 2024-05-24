@@ -88,13 +88,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut directories_counter = 0;
         loop {
             let files_count = handle_c.block_on(async {
-                let files = models::definitions::File::select_all(&pool_c).await.unwrap_or_default();
-                files.len()
+                let result = models::definitions::File::count_all(&pool_c).await.unwrap_or_default();
+                result
             });
 
             let directories_count = handle_c.block_on(async {
-                let directories = models::definitions::Directory::select_all(&pool_c).await.unwrap_or_default();
-                directories.len()
+                let result = models::definitions::Directory::count_all(&pool_c).await.unwrap_or_default();
+                result
             });
 
             let files_count_diff = files_count - files_counter;
