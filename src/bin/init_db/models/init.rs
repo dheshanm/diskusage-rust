@@ -19,12 +19,7 @@ pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Erro
         DROP TABLE IF EXISTS files;
     "#;
 
-    let drop_file_structure_table = r#"
-        DROP TABLE IF EXISTS dir_structure;
-    "#;
-
     let drop_queries = vec![
-        drop_file_structure_table,
         drop_file_table,
         drop_directory_table,
         drop_user_table,
@@ -73,6 +68,7 @@ pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Er
             size BIGINT NOT NULL,
             owner_id INT,
             directory_id TEXT NOT NULL,
+            last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_id) REFERENCES users(user_id),
             FOREIGN KEY (directory_id) REFERENCES directories(directory_id)
         );
@@ -82,29 +78,13 @@ pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Er
         CREATE INDEX file_directory_id ON files(directory_id);
     "#;
 
-    let create_file_structure_table = r#"
-        CREATE TABLE dir_structure (
-            parent_dir_id TEXT,
-            child_dir_id TEXT,
-            FOREIGN KEY (parent_dir_id) REFERENCES directories(directory_id),
-            FOREIGN KEY (child_dir_id) REFERENCES directories(directory_id),
-            PRIMARY KEY (parent_dir_id, child_dir_id)
-        );
-    "#;
-
-    let create_file_structure_parent_index = r#"
-        CREATE INDEX file_structure_parent_id ON dir_structure(parent_dir_id);
-    "#;
-
     let init_queries = vec![
         create_user_table,
         create_directory_table,
         create_directory_owner_index,
         create_directory_parent_index,
         create_file_table,
-        create_file_directory_index,
-        create_file_structure_table,
-        create_file_structure_parent_index,
+        create_file_directory_index
     ];
 
     db::execute_queries::as_transaction(pool, init_queries, debug).await?;

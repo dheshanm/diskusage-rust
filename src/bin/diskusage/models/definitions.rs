@@ -22,12 +22,7 @@ pub struct File {
     pub size: i64,
     pub owner_id: Option<i32>,
     pub directory_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct FileStructure {
-    pub parent_dir_id: String,
-    pub child_dir_id: String,
+    pub last_modified: Option<chrono::NaiveDateTime>,
 }
 
 #[async_trait::async_trait]
@@ -38,6 +33,7 @@ pub trait DbModel {
     async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error>;
     async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error>;
     async fn select_where(pool: &sqlx::Pool<sqlx::postgres::Postgres>, where_clause: &str) -> Result<Vec<Box<Self>>, sqlx::Error>;
+    async fn count_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<i64, sqlx::Error>;
 }
 
 #[async_trait::async_trait]
@@ -110,6 +106,13 @@ impl DbModel for User {
             })
             .collect();
         Ok(users)
+    }
+
+    async fn count_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query("SELECT COUNT(*) FROM users")
+            .fetch_one(pool)
+            .await?;
+        Ok(count.get("count"))
     }
 }
 
@@ -188,18 +191,26 @@ impl DbModel for Directory {
 
         Ok(directories)
     }
+
+    async fn count_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query("SELECT COUNT(*) FROM directories")
+            .fetch_one(pool)
+            .await?;
+        Ok(count.get("count"))
+    }
 }
 
 #[async_trait::async_trait]
 impl DbModel for File {
     async fn insert(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "INSERT INTO files (file_id, name, size, owner_id, directory_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (file_id) DO UPDATE SET name = $2, size = $3, owner_id = $4, directory_id = $5",
+            "INSERT INTO files (file_id, name, size, owner_id, directory_id, last_modified) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (file_id) DO UPDATE SET name = $2, size = $3, owner_id = $4, directory_id = $5",
             self.file_id,
             self.name,
             self.size,
             self.owner_id,
-            self.directory_id
+            self.directory_id,
+            self.last_modified
         )
         .execute(pool)
         .await?;
@@ -233,7 +244,7 @@ impl DbModel for File {
     async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error> {
         let file = sqlx::query_as!(
             File,
-            "SELECT file_id, name, size, owner_id, directory_id FROM files WHERE file_id = $1",
+            "SELECT file_id, name, size, owner_id, directory_id, last_modified FROM files WHERE file_id = $1",
             self.file_id
         )
         .fetch_one(pool)
@@ -244,7 +255,7 @@ impl DbModel for File {
     async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error> {
         let files = sqlx::query_as!(
             File,
-            "SELECT file_id, name, size, owner_id, directory_id FROM files"
+            "SELECT file_id, name, size, owner_id, directory_id, last_modified FROM files"
         )
         .fetch_all(pool)
         .await?;
@@ -265,10 +276,18 @@ impl DbModel for File {
                     size: row.get("size"),
                     owner_id: row.get("owner_id"),
                     directory_id: row.get("directory_id"),
+                    last_modified: row.get("last_modified"),
                 })
             })
             .collect();
 
         Ok(files)
+    }
+
+    async fn count_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query("SELECT COUNT(*) FROM files")
+            .fetch_one(pool)
+            .await?;
+        Ok(count.get("count"))
     }
 }
