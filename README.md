@@ -10,6 +10,12 @@ This crawler is written in Rust and uses the `walkdir` crate to traverse the dir
 - Uses `sqlx` to write the data to a postgres database.
 - Estimates the disk usage of a folder, using a recursive query in the database.
 
+## Use Cases
+- Calculate the disk usage of an especially large directory.
+  - If looking for something more lightweight, consider using the `du` command or [parallel-disk-usage](https://github.com/KSXGitHub/parallel-disk-usage) instead.
+- See the owner of the files and directories.
+  - Most other programs do only look at the size of the files and directories.
+
 ## Prerequisites
 - An configured and accessible postgres database.
 
