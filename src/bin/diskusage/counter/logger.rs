@@ -7,7 +7,7 @@ use crate::models::definitions::DbModel;
 /// Arguments
 /// * `handle` - A tokio runtime handle to run the async functions.
 /// * `pool` - A sqlx database pool to query the database.
-pub async fn logger_thread(handle: tokio::runtime::Handle, pool: sqlx::Pool<sqlx::Postgres>) {
+pub async fn logger_thread(handle: tokio::runtime::Handle, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>) {
     std::thread::spawn(move || {
         let log_frequency = match std::env::var("DISK_USAGE_LOG_FREQUENCY") {
             Ok(frequency) => {

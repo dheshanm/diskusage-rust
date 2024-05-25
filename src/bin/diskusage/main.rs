@@ -23,6 +23,84 @@ struct Arguments {
     debug: bool,   
 }
 
+async fn ensure_user_exists(owner: Option<i32>, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>) -> Result<(), sqlx::Error> {
+    if let Some(owner_id) = owner {
+        let select_user_where_clause = format!("WHERE user_id = {}", owner_id);
+        let user = models::definitions::User::select_where(&pool, &select_user_where_clause).await.unwrap_or_default();
+    
+        if user.is_empty() {
+            let user = models::definitions::User {
+                user_id: owner_id,
+                username: users::username::get_username(owner_id as u32)
+            };
+            user.insert(&pool).await?;
+        }
+    }
+    Ok(())
+}
+
+fn process_directory(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>, handle: tokio::runtime::Handle) {
+    let dir_path = entry.path();
+    let owner = filesystem::fetch::owner(dir_path).map(|x| x as i32);
+    let parent_dir = dir_path.parent().unwrap_or(std::path::Path::new("/"));
+
+    let directory = models::definitions::Directory {
+        directory_id: dir_path.to_string_lossy().to_string(),
+        owner_id: owner,
+        parent_id: Some(parent_dir.to_string_lossy().to_string()),
+    };
+
+    handle.block_on(async move {
+        if let Err(e) = ensure_user_exists(owner, pool.clone()).await {
+            log::error!("Failed to insert user: {:?}", e);
+            return;
+        }
+        if let Err(e) = directory.insert(&pool).await {
+            log::error!("Error inserting directory: {:?}", e);
+        }
+    });
+}
+
+fn process_file(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>, handle: tokio::runtime::Handle) {
+    let file_path = entry.path();
+    let owner = filesystem::fetch::owner(file_path).map(|x| x as i32);
+    let file_size = filesystem::fetch::file_size(file_path).unwrap_or_default();
+    let last_modified = filesystem::fetch::last_modified(file_path).ok();
+    let parent_dir = file_path.parent().unwrap_or(std::path::Path::new("/"));
+
+    let file = models::definitions::File {
+        file_id: file_path.to_string_lossy().to_string(),
+        name: file_path.file_name().unwrap().to_string_lossy().to_string(),
+        size: file_size as i64,
+        owner_id: owner,
+        directory_id: parent_dir.to_string_lossy().to_string(),
+        last_modified,
+    };
+
+    handle.block_on(async move {
+        if let Err(e) = ensure_user_exists(owner, pool.clone()).await {
+            log::error!("Failed to insert user: {:?}", e);
+            return;
+        }
+
+        loop {
+            let result = file.insert(&pool).await;
+            // If PgDatabaseError is returned, retry the insert
+            if let Err(sqlx::Error::Database(_)) = result {
+                // sleep for random time between 1 and 5 seconds
+                let sleep_time = rand::random::<u64>() % 5 + 1;
+                tokio::time::sleep(tokio::time::Duration::from_secs(sleep_time)).await;
+                continue;
+            }
+            break;
+        }
+
+        if let Err(e) = file.insert(&pool).await {
+            log::error!("Error inserting file: {:?}", e);
+        }
+    });
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::new()
@@ -49,22 +127,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(&database_url).await;
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to connect to database: {}", e);
+            e
+        })?;
+
+    log::info!("Connected to database: {}", database_url);
+    let pool = std::sync::Arc::new(pool);
     let handle: tokio::runtime::Handle = tokio::runtime::Handle::current();
 
-    let pool = match pool_result {
-        Ok(pool) => {
-            log::info!("Connected to database: {}", database_url);
-            pool
-        }
-        Err(e) => {
-            log::error!("Failed to connect to database: {}", e);
-            return Err(e.into());
-        }
-    };
-
     // Spawn a thread to query files processed periodically
-    let pool_c: sqlx::Pool<sqlx::Postgres> = pool.clone();
+    let pool_c = std::sync::Arc::clone(&pool);
     let handle_c: tokio::runtime::Handle = handle.clone();
     counter::logger::logger_thread(handle_c, pool_c).await;
     
@@ -74,99 +150,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .par_bridge() // Allows rayon to process entries in parallel
         .filter_map(|entry| entry.ok())
         .for_each(|entry| {
-            // Check if file or directory
+            let pool = std::sync::Arc::clone(&pool);
+            let handle = handle.clone();
             if entry.file_type().is_dir() {
-                let dir_path = entry.path();
-                let owner: Option<u32> = filesystem::fetch::owner(dir_path);
-                let owner_i32: Option<i32> = owner.map(|x| x as i32);
-                let parent_dir = dir_path.parent().unwrap_or(std::path::Path::new("/") );
-
-                let select_user_where_clause = format!("WHERE user_id = {}", owner_i32.unwrap_or_default());
-                let pool_c = pool.clone();
-                handle.block_on(async move {
-                    let user = models::definitions::User::select_where(&pool_c, &select_user_where_clause).await.unwrap_or_default();
-                    if user.is_empty() {
-                        let user = models::definitions::User {
-                            user_id: owner_i32.unwrap_or_default(),
-                            username: users::username::get_username(owner.unwrap_or_default())
-                        };
-                        user.insert(&pool_c).await.unwrap();
-                    }
-                });
-                
-                let directory: models::definitions::Directory = models::definitions::Directory {
-                    directory_id: dir_path.to_string_lossy().to_string(),
-                    owner_id: owner_i32,
-                    parent_id: Some(parent_dir.to_string_lossy().to_string()),
-                };
-
-                // log::info!("directory: {:?}", directory);
-                handle.block_on(async {
-                    loop {
-                        let result = directory.insert(&pool).await;
-                        match result {
-                            Ok(_) => {
-                                break;
-                            }
-                            Err(e) => {
-                                // Terminal error
-                                log::error!("Error inserting directory: {:?}", e);
-                                std::process::exit(1);
-                            }
-                        }   
-                    }
-                });
-            } else {
-                let file_path = entry.path();
-                let owner: Option<u32> = filesystem::fetch::owner(file_path);
-                let owner_i32: Option<i32> = owner.map(|x| x as i32);
-                let file_size = filesystem::fetch::file_size(file_path).unwrap_or_default();
-                let last_modified = filesystem::fetch::last_modified(file_path);
-                let last_modified_option = last_modified.ok();
-
-                let parent_dir = file_path.parent().unwrap_or(std::path::Path::new("/") );
-                let file: models::definitions::File = models::definitions::File {
-                    file_id: file_path.to_string_lossy().to_string(),
-                    name: file_path.file_name().unwrap().to_string_lossy().to_string(),
-                    size: file_size as i64,
-                    owner_id: owner_i32,
-                    directory_id: parent_dir.to_string_lossy().to_string(),
-                    last_modified: last_modified_option,
-                };
-
-                let select_user_where_clause = format!("WHERE user_id = {}", owner_i32.unwrap_or_default());
-                let pool_c = pool.clone();
-                handle.block_on(async move {
-                    let user = models::definitions::User::select_where(&pool_c, &select_user_where_clause).await.unwrap_or_default();
-                    if user.is_empty() {
-                        let user = models::definitions::User {
-                            user_id: owner_i32.unwrap_or_default(),
-                            username: users::username::get_username(owner.unwrap_or_default())
-                        };
-                        user.insert(&pool_c).await.unwrap();
-                    }
-                });
-
-                handle.block_on(async {
-                    loop {
-                        let result = file.insert(&pool).await;
-                        match result {
-                            Ok(_) => {
-                                break;
-                            }
-                            Err(e) => {
-                                // Could mean that the directory has not been inserted yet
-                                // Sleep for a random time and retry.
-                                let sleep_time = rand::random::<u64>() % 5 + 1;
-                                log::debug!("Error inserting file: {:?}. Retrying in {} seconds", e, sleep_time);
-                                std::thread::sleep(std::time::Duration::from_secs(sleep_time));
-                            }
-                            
-                        }
-                    }
-                });
-
-                // log::info!("file: {:?}", file);
+                process_directory(entry, pool, handle);
+            } else if entry.file_type().is_file() {
+                process_file(entry, pool, handle);
             }
         });
 
