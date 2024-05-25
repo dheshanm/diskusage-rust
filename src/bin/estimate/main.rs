@@ -1,13 +1,9 @@
 use clap::Parser;
-use sqlx::Row;
 use sqlx::types::BigDecimal;
+use sqlx::Row;
 
 #[derive(clap::Parser, Default, Debug)]
-#[clap(
-    author = "Dheshan Mohandass",
-    version,
-    about
-)]
+#[clap(author = "Dheshan Mohandass", version, about)]
 /// A companion tool for the disk usage tracker to estimate a directory's size.
 struct Arguments {
     /// The path to the directory to estimate.
@@ -35,7 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(&database_url).await;
+    let pool_result = sqlx::postgres::PgPoolOptions::new()
+        .connect(&database_url)
+        .await;
 
     let pool = match pool_result {
         Ok(pool) => {
@@ -68,9 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         path
     );
 
-    let result = sqlx::query(&query)
-        .fetch_one(&pool)
-        .await?;
+    let result = sqlx::query(&query).fetch_one(&pool).await?;
 
     // NUMERIC type
     let total_size: BigDecimal = result.try_get("total_size")?;
@@ -83,4 +79,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

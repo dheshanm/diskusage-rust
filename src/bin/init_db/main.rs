@@ -3,16 +3,12 @@ mod models;
 use clap::Parser;
 
 #[derive(clap::Parser, Default, Debug)]
-#[clap(
-    author = "Dheshan Mohandass",
-    version,
-    about
-)]
+#[clap(author = "Dheshan Mohandass", version, about)]
 /// A companion tool for the disk usage tracker to initialize the database.
 struct Arguments {
     /// Enable debug mode.
     #[clap(short, long)]
-    debug: bool,   
+    debug: bool,
 }
 
 #[tokio::main]
@@ -35,7 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let pool_result = sqlx::postgres::PgPoolOptions::new().connect(&database_url).await;
+    let pool_result = sqlx::postgres::PgPoolOptions::new()
+        .connect(&database_url)
+        .await;
 
     let pool = match pool_result {
         Ok(pool) => {

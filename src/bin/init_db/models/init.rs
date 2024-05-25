@@ -1,10 +1,10 @@
 use db;
 
 /// Drops all tables in the database.
-/// 
+///
 /// * `pool` - A reference to a sqlx::PgPool.
 /// * `debug` - A boolean value. If True, log the queries (does not execute them).
-/// 
+///
 /// Returns a Result containing unit or an sqlx::Error.
 pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Error> {
     let drop_user_table = r#"
@@ -19,11 +19,7 @@ pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Erro
         DROP TABLE IF EXISTS files;
     "#;
 
-    let drop_queries = vec![
-        drop_file_table,
-        drop_directory_table,
-        drop_user_table,
-    ];
+    let drop_queries = vec![drop_file_table, drop_directory_table, drop_user_table];
 
     db::execute_queries::as_transaction(pool, drop_queries, debug).await?;
 
@@ -31,10 +27,10 @@ pub async fn drop_all(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Erro
 }
 
 /// Initializes the database with the necessary tables.
-/// 
+///
 /// * `pool` - A reference to a sqlx::PgPool.
 /// * `debug` - A boolean value. If True, log the queries (does not execute them).
-/// 
+///
 /// Returns a Result containing unit or an sqlx::Error.
 pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Error> {
     let create_user_table = r#"
@@ -84,7 +80,7 @@ pub async fn initialize(pool: &sqlx::PgPool, debug: bool) -> Result<(), sqlx::Er
         create_directory_owner_index,
         create_directory_parent_index,
         create_file_table,
-        create_file_directory_index
+        create_file_directory_index,
     ];
 
     db::execute_queries::as_transaction(pool, init_queries, debug).await?;

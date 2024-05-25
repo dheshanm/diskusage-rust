@@ -5,7 +5,7 @@ use sqlx::Row;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct User {
     pub user_id: i32,
-    pub username: Option<String>
+    pub username: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -30,9 +30,17 @@ pub trait DbModel {
     async fn insert(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error>;
     async fn update(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error>;
     async fn delete(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error>;
-    async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error>;
-    async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error>;
-    async fn select_where(pool: &sqlx::Pool<sqlx::postgres::Postgres>, where_clause: &str) -> Result<Vec<Box<Self>>, sqlx::Error>;
+    async fn select(
+        &self,
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Box<Self>, sqlx::Error>;
+    async fn select_all(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Vec<Box<Self>>, sqlx::Error>;
+    async fn select_where(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+        where_clause: &str,
+    ) -> Result<Vec<Box<Self>>, sqlx::Error>;
     async fn count_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<i64, sqlx::Error>;
 }
 
@@ -61,16 +69,16 @@ impl DbModel for User {
     }
 
     async fn delete(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            "DELETE FROM users WHERE user_id = $1",
-            self.user_id
-        )
-        .execute(pool)
-        .await?;
+        sqlx::query!("DELETE FROM users WHERE user_id = $1", self.user_id)
+            .execute(pool)
+            .await?;
         Ok(())
     }
 
-    async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error> {
+    async fn select(
+        &self,
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Box<Self>, sqlx::Error> {
         let user = sqlx::query_as!(
             User,
             "SELECT user_id, username FROM users WHERE user_id = $1",
@@ -81,23 +89,24 @@ impl DbModel for User {
         Ok(Box::new(user))
     }
 
-    async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error> {
-        let users = sqlx::query_as!(
-            User,
-            "SELECT user_id, username FROM users"
-        )
-        .fetch_all(pool)
-        .await?;
+    async fn select_all(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Vec<Box<Self>>, sqlx::Error> {
+        let users = sqlx::query_as!(User, "SELECT user_id, username FROM users")
+            .fetch_all(pool)
+            .await?;
         Ok(users.into_iter().map(|u| Box::new(u)).collect())
     }
 
-    async fn select_where(pool: &sqlx::Pool<sqlx::postgres::Postgres>, where_clause: &str) -> Result<Vec<Box<User>>, sqlx::Error> {
+    async fn select_where(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+        where_clause: &str,
+    ) -> Result<Vec<Box<User>>, sqlx::Error> {
         let query_string = format!("SELECT user_id, username FROM users WHERE {}", where_clause);
-        let rows = sqlx::query(&query_string)
-            .fetch_all(pool)
-            .await?;
-    
-        let users: Vec<Box<User>> = rows.into_iter()
+        let rows = sqlx::query(&query_string).fetch_all(pool).await?;
+
+        let users: Vec<Box<User>> = rows
+            .into_iter()
             .map(|row| {
                 Box::new(User {
                     user_id: row.get("user_id"),
@@ -152,7 +161,10 @@ impl DbModel for Directory {
         Ok(())
     }
 
-    async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error> {
+    async fn select(
+        &self,
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Box<Self>, sqlx::Error> {
         let directory = sqlx::query_as!(
             Directory,
             "SELECT directory_id, owner_id, parent_id FROM directories WHERE directory_id = $1",
@@ -163,7 +175,9 @@ impl DbModel for Directory {
         Ok(Box::new(directory))
     }
 
-    async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error> {
+    async fn select_all(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Vec<Box<Self>>, sqlx::Error> {
         let directories = sqlx::query_as!(
             Directory,
             "SELECT directory_id, owner_id, parent_id FROM directories"
@@ -173,13 +187,18 @@ impl DbModel for Directory {
         Ok(directories.into_iter().map(|d| Box::new(d)).collect())
     }
 
-    async fn select_where(pool: &sqlx::Pool<sqlx::postgres::Postgres>, where_clause: &str) -> Result<Vec<Box<Directory>>, sqlx::Error> {
-        let query_string = format!("SELECT directory_id, owner_id, parent_id FROM directories WHERE {}", where_clause);
-        let rows = sqlx::query(&query_string)
-            .fetch_all(pool)
-            .await?;
+    async fn select_where(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+        where_clause: &str,
+    ) -> Result<Vec<Box<Directory>>, sqlx::Error> {
+        let query_string = format!(
+            "SELECT directory_id, owner_id, parent_id FROM directories WHERE {}",
+            where_clause
+        );
+        let rows = sqlx::query(&query_string).fetch_all(pool).await?;
 
-        let directories: Vec<Box<Directory>> = rows.into_iter()
+        let directories: Vec<Box<Directory>> = rows
+            .into_iter()
             .map(|row| {
                 Box::new(Directory {
                     directory_id: row.get("directory_id"),
@@ -232,16 +251,16 @@ impl DbModel for File {
     }
 
     async fn delete(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            "DELETE FROM files WHERE file_id = $1",
-            self.file_id
-        )
-        .execute(pool)
-        .await?;
+        sqlx::query!("DELETE FROM files WHERE file_id = $1", self.file_id)
+            .execute(pool)
+            .await?;
         Ok(())
     }
 
-    async fn select(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Box<Self>, sqlx::Error> {
+    async fn select(
+        &self,
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Box<Self>, sqlx::Error> {
         let file = sqlx::query_as!(
             File,
             "SELECT file_id, name, size, owner_id, directory_id, last_modified FROM files WHERE file_id = $1",
@@ -252,7 +271,9 @@ impl DbModel for File {
         Ok(Box::new(file))
     }
 
-    async fn select_all(pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<Vec<Box<Self>>, sqlx::Error> {
+    async fn select_all(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<Vec<Box<Self>>, sqlx::Error> {
         let files = sqlx::query_as!(
             File,
             "SELECT file_id, name, size, owner_id, directory_id, last_modified FROM files"
@@ -261,14 +282,19 @@ impl DbModel for File {
         .await?;
         Ok(files.into_iter().map(|f| Box::new(f)).collect())
     }
-    
-    async fn select_where(pool: &sqlx::Pool<sqlx::postgres::Postgres>, where_clause: &str) -> Result<Vec<Box<File>>, sqlx::Error> {
-        let query_string = format!("SELECT file_id, name, size, owner_id, directory_id FROM files WHERE {}", where_clause);
-        let rows = sqlx::query(&query_string)
-            .fetch_all(pool)
-            .await?;
 
-        let files: Vec<Box<File>> = rows.into_iter()
+    async fn select_where(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+        where_clause: &str,
+    ) -> Result<Vec<Box<File>>, sqlx::Error> {
+        let query_string = format!(
+            "SELECT file_id, name, size, owner_id, directory_id FROM files WHERE {}",
+            where_clause
+        );
+        let rows = sqlx::query(&query_string).fetch_all(pool).await?;
+
+        let files: Vec<Box<File>> = rows
+            .into_iter()
             .map(|row| {
                 Box::new(File {
                     file_id: row.get("file_id"),

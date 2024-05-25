@@ -10,14 +10,11 @@ use std::path::Path;
 pub fn file_size(path: &Path) -> Result<u64, std::io::Error> {
     let metadata = std::fs::metadata(path);
     match metadata {
-        Ok(metadata) => {
-            Ok(metadata.len())
-        }
+        Ok(metadata) => Ok(metadata.len()),
         Err(e) => {
             log::error!("Error getting file size: {:?}", e);
             Err(e)
         }
-        
     }
 }
 
@@ -30,9 +27,7 @@ pub fn file_size(path: &Path) -> Result<u64, std::io::Error> {
 pub fn owner(path: &Path) -> Option<u32> {
     let metadata = std::fs::metadata(path);
     match metadata {
-        Ok(metadata) => {
-            Some(metadata.uid())
-        }
+        Ok(metadata) => Some(metadata.uid()),
         Err(_) => {
             log::error!("Error getting owner of file: {:?}", path);
             None
@@ -40,11 +35,10 @@ pub fn owner(path: &Path) -> Option<u32> {
     }
 }
 
-
 /// Get the last modified time of a file or directory.
-/// 
+///
 /// * `path` - The path to the file.
-/// 
+///
 /// Returns
 /// The last modified time of the file in chrono::DateTime<chrono::Utc>.
 pub fn last_modified(path: &Path) -> Result<chrono::NaiveDateTime, std::io::Error> {
@@ -61,11 +55,9 @@ pub fn last_modified(path: &Path) -> Result<chrono::NaiveDateTime, std::io::Erro
                 Err(e) => {
                     log::error!("Error getting modified time: {:?}", e);
                     Err(e)
-                }   
+                }
             }
         }
-        Err(e) => {
-            Err(e)
-        }
+        Err(e) => Err(e),
     }
 }
