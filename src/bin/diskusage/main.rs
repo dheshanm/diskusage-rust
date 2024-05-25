@@ -1,45 +1,58 @@
-mod models;
-mod filesystem;
-mod users;
 mod counter;
+mod filesystem;
+mod models;
+mod users;
 
+use crate::models::definitions::DbModel;
 use clap::Parser;
 use rayon::prelude::*;
-use crate::models::definitions::DbModel;
 
 #[derive(clap::Parser, Default, Debug)]
-#[clap(
-    author = "Dheshan Mohandass",
-    version,
-    about
-)]
+#[clap(author = "Dheshan Mohandass", version, about)]
 /// A CLI tool for tracking disk usage.
 struct Arguments {
     /// The root directory to track.
     #[clap(short, long)]
-    root_dir: String,  
+    root_dir: String,
     /// Enable debug mode.
     #[clap(short, long)]
-    debug: bool,   
+    debug: bool,
 }
 
-async fn ensure_user_exists(owner: Option<i32>, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>) -> Result<(), sqlx::Error> {
+async fn ensure_user_exists(
+    owner: Option<i32>,
+    pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
+    cache: std::sync::Arc<dashmap::DashSet<i32>>,
+) -> Result<(), sqlx::Error> {
     if let Some(owner_id) = owner {
+        // Check if the user exists in the cache
+        if let Some(_) = cache.get(&owner_id) {
+            return Ok(());
+        }
         let select_user_where_clause = format!("WHERE user_id = {}", owner_id);
-        let user = models::definitions::User::select_where(&pool, &select_user_where_clause).await.unwrap_or_default();
-    
+        let user = models::definitions::User::select_where(&pool, &select_user_where_clause)
+            .await
+            .unwrap_or_default();
+
         if user.is_empty() {
             let user = models::definitions::User {
                 user_id: owner_id,
-                username: users::username::get_username(owner_id as u32)
+                username: users::username::get_username(owner_id as u32),
             };
             user.insert(&pool).await?;
         }
+
+        cache.insert(owner_id);
     }
     Ok(())
 }
 
-fn process_directory(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>, handle: tokio::runtime::Handle) {
+fn process_directory(
+    entry: walkdir::DirEntry,
+    pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
+    handle: tokio::runtime::Handle,
+    cache: std::sync::Arc<dashmap::DashSet<i32>>,
+) {
     let dir_path = entry.path();
     let owner = filesystem::fetch::owner(dir_path).map(|x| x as i32);
     let parent_dir = dir_path.parent().unwrap_or(std::path::Path::new("/"));
@@ -51,7 +64,7 @@ fn process_directory(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<s
     };
 
     handle.block_on(async move {
-        if let Err(e) = ensure_user_exists(owner, pool.clone()).await {
+        if let Err(e) = ensure_user_exists(owner, pool.clone(), cache.clone()).await {
             log::error!("Failed to insert user: {:?}", e);
             return;
         }
@@ -61,7 +74,12 @@ fn process_directory(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<s
     });
 }
 
-fn process_file(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>, handle: tokio::runtime::Handle) {
+fn process_file(
+    entry: walkdir::DirEntry,
+    pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
+    handle: tokio::runtime::Handle,
+    cache: std::sync::Arc<dashmap::DashSet<i32>>,
+) {
     let file_path = entry.path();
     let owner = filesystem::fetch::owner(file_path).map(|x| x as i32);
     let file_size = filesystem::fetch::file_size(file_path).unwrap_or_default();
@@ -78,7 +96,7 @@ fn process_file(entry: walkdir::DirEntry, pool: std::sync::Arc<sqlx::Pool<sqlx::
     };
 
     handle.block_on(async move {
-        if let Err(e) = ensure_user_exists(owner, pool.clone()).await {
+        if let Err(e) = ensure_user_exists(owner, pool.clone(), cache.clone()).await {
             log::error!("Failed to insert user: {:?}", e);
             return;
         }
@@ -143,7 +161,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool_c = std::sync::Arc::clone(&pool);
     let handle_c: tokio::runtime::Handle = handle.clone();
     counter::logger::logger_thread(handle_c, pool_c).await;
-    
+
+    let cache: std::sync::Arc<dashmap::DashSet<i32>> = std::sync::Arc::new(dashmap::DashSet::new());
+
     log::info!("Starting disk usage tracking for: {}", root_dir);
     walkdir::WalkDir::new(root_dir)
         .into_iter()
@@ -153,9 +173,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let pool = std::sync::Arc::clone(&pool);
             let handle = handle.clone();
             if entry.file_type().is_dir() {
-                process_directory(entry, pool, handle);
+                process_directory(entry, pool, handle, cache.clone());
             } else if entry.file_type().is_file() {
-                process_file(entry, pool, handle);
+                process_file(entry, pool, handle, cache.clone());
             }
         });
 
