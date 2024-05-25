@@ -690,6 +690,7 @@ dependencies = [
  "bigdecimal 0.4.3",
  "chrono",
  "clap",
+ "comfy-table",
  "connectorx",
  "dashmap",
  "env_logger",
