@@ -11,8 +11,10 @@ struct Arguments {
     /// The path to the directory to estimate.
     #[clap(short, long)]
     path: String,
+    /// The number of large files to display.
     #[clap(short, long, default_value = "5")]
     large_files_count: usize,
+    /// The offset to start displaying large files.
     #[clap(short, long, default_value = "0")]
     offset: usize,
 }
@@ -82,7 +84,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let size_gb: BigDecimal = size_mb.clone() / 1024;
     let size_tb: BigDecimal = size_gb.clone() / 1024;
 
-    log::info!("Estimated size: {:.2} TB = {:.2} GB = {:.2} MB = {:.2} KB = {:.2} bytes", size_tb, size_gb, size_mb, size_kb, total_size);
+    log::info!(
+        "Estimated size: {:.2} TB = {:.2} GB = {:.2} MB = {:.2} KB = {:.2} bytes",
+        size_tb,
+        size_gb,
+        size_mb,
+        size_kb,
+        total_size
+    );
 
     let largest_files_query = format!(
         r#"
@@ -131,7 +140,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for i in 0..df_row_count {
             let mut row: Vec<String> = vec![];
             for series in df.get_columns() {
-                let value: Result<polars::prelude::AnyValue, polars::prelude::PolarsError> = series.get(i);
+                let value: Result<polars::prelude::AnyValue, polars::prelude::PolarsError> =
+                    series.get(i);
                 let value_str = match value {
                     Ok(value) => value.to_string(),
                     Err(_) => "".to_string(),
@@ -143,7 +153,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Largest files in directory:");
         println!("{table}")
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }

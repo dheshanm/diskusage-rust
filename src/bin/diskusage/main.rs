@@ -19,6 +19,18 @@ struct Arguments {
     debug: bool,
 }
 
+/// Ensure that the user exists in the database.
+/// If the user does not exist, insert the user into the database.
+/// Users are stored in a cache to prevent querying the database for the same user multiple times.
+///
+/// Arguments
+/// * `owner` - The user id to check.
+/// * `pool` - The database connection pool.
+/// * `cache` - The cache to store user ids.
+///
+/// Returns
+/// * Ok(()) if the user exists or is inserted successfully.
+/// * Err(sqlx::Error) if an error occurs while inserting the user.
 async fn ensure_user_exists(
     owner: Option<i32>,
     pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
@@ -47,6 +59,17 @@ async fn ensure_user_exists(
     Ok(())
 }
 
+/// Process a directory entry.
+/// Insert the directory into the database. If the directory already exists, update the directory.
+///
+/// Arguments
+/// * `entry` - The directory entry to process.
+/// * `pool` - The database connection pool.
+/// * `handle` - The tokio runtime handle.
+/// * `cache` - The cache to store user ids.
+///
+/// Returns
+/// * None
 fn process_directory(
     entry: walkdir::DirEntry,
     pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
@@ -74,6 +97,19 @@ fn process_directory(
     });
 }
 
+/// Process a file entry.
+/// Insert the file into the database. If the file already exists, update the file.
+/// If the file is not inserted, retry the insert. Assume the file is not inserted due to
+/// its parent directory not being inserted.
+///
+/// Arguments
+/// * `entry` - The file entry to process.
+/// * `pool` - The database connection pool.
+/// * `handle` - The tokio runtime handle.
+/// * `cache` - The cache to store user ids.
+///
+/// Returns
+/// * None
 fn process_file(
     entry: walkdir::DirEntry,
     pool: std::sync::Arc<sqlx::Pool<sqlx::Postgres>>,
