@@ -11,6 +11,10 @@ struct Arguments {
     /// The path to the directory to estimate.
     #[clap(short, long)]
     path: String,
+    #[clap(short, long, default_value = "5")]
+    large_files_count: usize,
+    #[clap(short, long, default_value = "0")]
+    offset: usize,
 }
 
 #[tokio::main]
@@ -23,6 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("{:?}", args);
 
     let path = args.path;
+    let large_files_count = args.large_files_count;
+    let offset = args.offset;
 
     // get the database url from the environment
     let database_url = match std::env::var("DATABASE_URL") {
@@ -53,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         WITH RECURSIVE directory_tree AS (
             SELECT d.directory_id
             FROM directories d
-            WHERE d.directory_id = '{}'
+            WHERE d.directory_id = '{path}'
 
             UNION ALL
             
@@ -64,8 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SELECT COALESCE(SUM(f.size), 0) / 1024 AS total_size
         FROM files f
         WHERE f.directory_id IN (SELECT directory_id FROM directory_tree)
-        "#,
-        path
+        "#
     );
 
     let result = sqlx::query(&query).fetch_one(&pool).await?;
@@ -96,7 +101,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         FROM files f
         WHERE f.directory_id IN (SELECT directory_id FROM directory_tree)
         ORDER BY f.size DESC
-        LIMIT 5
+        OFFSET {offset}
+        LIMIT {large_files_count}
         "#,
     );
 
