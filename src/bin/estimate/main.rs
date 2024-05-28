@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             FROM directories d
             INNER JOIN directory_tree dt ON d.parent_id = dt.directory_id
         )
-        SELECT COALESCE(SUM(f.size), 0) / 1024 AS total_size
+        SELECT COALESCE(SUM(f.size), 0) AS total_size
         FROM files f
         WHERE f.directory_id IN (SELECT directory_id FROM directory_tree)
         "#
