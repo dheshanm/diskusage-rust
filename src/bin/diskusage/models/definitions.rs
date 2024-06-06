@@ -45,6 +45,13 @@ pub trait DbModel {
 }
 
 #[async_trait::async_trait]
+pub trait DbEstimateRow {
+    async fn estimate_count(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<i64, sqlx::Error>;
+}
+
+#[async_trait::async_trait]
 impl DbModel for User {
     async fn insert(&self, pool: &sqlx::Pool<sqlx::postgres::Postgres>) -> Result<(), sqlx::Error> {
         sqlx::query!(
@@ -315,5 +322,43 @@ impl DbModel for File {
             .fetch_one(pool)
             .await?;
         Ok(count.get("count"))
+    }
+}
+
+#[async_trait::async_trait]
+impl DbEstimateRow for File {
+    async fn estimate_count(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<i64, sqlx::Error> {
+        let query = format!(
+            r#"
+            SELECT reltuples AS estimated_rows
+            FROM pg_class
+            WHERE relname = 'files';
+            "#
+        );
+
+        let row = sqlx::query(&query).fetch_one(pool).await?;
+        let estimated_rows: i64 = row.get("estimated_rows");
+        Ok(estimated_rows)
+    }
+}
+
+#[async_trait::async_trait]
+impl DbEstimateRow for Directory {
+    async fn estimate_count(
+        pool: &sqlx::Pool<sqlx::postgres::Postgres>,
+    ) -> Result<i64, sqlx::Error> {
+        let query = format!(
+            r#"
+            SELECT reltuples AS estimated_rows
+            FROM pg_class
+            WHERE relname = 'directories';
+            "#
+        );
+
+        let row = sqlx::query(&query).fetch_one(pool).await?;
+        let estimated_rows: i64 = row.get("estimated_rows");
+        Ok(estimated_rows)
     }
 }
